@@ -6,7 +6,7 @@ use std::fs::File;
 use std::io::{self, BufRead};
 use std::path::Path;
 
-static VERSION: &'static str = "1.0.0";
+static VERSION: &'static str = "0.1.0";
 
 fn print_usage(prog: &str, opts: Options) {
     println!("mice {}", VERSION);
@@ -27,10 +27,16 @@ fn main() {
     opts.optflag("V", "version", "display current version");
     opts.optflag("n", "number", "number output lines");
     opts.optopt(
-        "p",
-        "peek",
-        "[BEGIN:END] displays certain lines of file",
-        "RANGE",
+        "b",
+        "begin",
+        "starting index of line to print (default 1)",
+        "INDEX",
+    );
+    opts.optopt(
+        "e",
+        "end",
+        "ending index of line to print (default EOF)",
+        "INDEX",
     );
 
     let matches = match opts.parse(&args[1..]) {
@@ -50,27 +56,64 @@ fn main() {
         return;
     }
 
-    if !matches.free.is_empty() {
-        if matches.free.len() == 1 {
-            print_lines(&matches.free[0]);
-        }
+    let mut begin: i32 = 0;
+    let mut end: i32 = -1;
+    let number = if matches.opt_present("n") {
+        true
     } else {
-        panic!("{}", "Error!");
+        false
+    };
+
+    if matches.opt_present("b") {
+        begin = if let Some(bs) = matches.opt_str("b") {
+            bs.parse::<i32>().unwrap_or_default()
+        } else {
+            panic!("");
+        }
     }
+
+    if matches.opt_present("e") {
+        end = if let Some(es) = matches.opt_str("e") {
+            es.parse::<i32>().unwrap_or_default()
+        } else {
+            panic!("");
+        }
+    }
+
+    let input = if matches.free.len() == 1 {
+        matches.free[0].clone()
+    } else {
+        panic!("");
+    };
+
+    print_lines(&input, number, begin, end);
 }
 
-fn print_lines(path: &str) {
+fn print_lines(path: &str, number: bool, begin: i32, end: i32) {
+    let mut i: i32 = 1;
     if let Ok(lines) = read_lines(path) {
         for line in lines {
-            if let Ok(ip) = line {
-                println!("{}", ip);
+            if i == end {
+                return;
             }
+            if i >= begin {
+                if let Ok(li) = line {
+                    if number {
+                        println!("{}{}  {}", " ".repeat(5 - i.ilog10() as usize), i, li);
+                    } else {
+                        println!("{}", li);
+                    }
+                }
+            }
+            i += 1;
         }
     }
 }
 
 fn read_lines<P>(filename: P) -> io::Result<io::Lines<io::BufReader<File>>>
-where P: AsRef<Path> {
+where
+    P: AsRef<Path>,
+{
     let file = File::open(filename)?;
     Ok(io::BufReader::new(file).lines())
 }
